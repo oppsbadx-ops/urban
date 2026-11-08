@@ -2294,7 +2294,7 @@ end)
 local Win = Library:Window({
     Title = "LARPHUB",
     Version = "V1.2",
-    Game = "Roblox",
+    Game = "urban",
     Width = 560,
     Height = 520,
 })
@@ -2522,7 +2522,7 @@ ControlSection:Keybind({
 -- Full Settings / Configs tab (save, load, delete, rejoin, server hop, theme, etc.)
 Library:SettingsTab(Win, {
     Name = "Configs",
-    Game = "Roblox",
+    Game = "urban",
     Credits = { "- LarpHub developer" },
 })
 
