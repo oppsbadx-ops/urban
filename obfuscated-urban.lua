@@ -897,7 +897,7 @@ end
 
 function Section:Button(Opts)
 	Opts = Opts or {}
-	local Holder = self:_Holder(23)
+local Holder = self:_Holder(23)
 	local Entry = self:_Register(Opts.Name, Holder, Opts)
 	local Row = {}
 
@@ -1769,7 +1769,6 @@ local AimSettings = {
     TargetPart = "Head",
     LockedPart = nil,
     LockedPlayer = nil,
-    PrevCameraType = nil,
 }
 
 local ESPSettings = {
@@ -1858,35 +1857,38 @@ local function GetClosestTarget()
     return BestPlayer, BestPart
 end
 
-local function RestoreCamera()
-    Camera = workspace.CurrentCamera
-    if not Camera then return end
-    if AimSettings.PrevCameraType ~= nil then
-        pcall(function()
-            Camera.CameraType = AimSettings.PrevCameraType
-        end)
-        AimSettings.PrevCameraType = nil
-    end
-end
-
 local function UnlockCam()
     AimSettings.Locked = false
     AimSettings.LockedPart = nil
     AimSettings.LockedPlayer = nil
-    RestoreCamera()
+
+    local Camera = workspace.CurrentCamera
+    if Camera then
+        pcall(function()
+            Camera.CameraType = Enum.CameraType.Custom
+        end)
+    end
+
+    pcall(function()
+        UserInputService.MouseBehavior = Enum.MouseBehavior.Default
+    end)
 end
 
 local function BeginLock(Player, Part)
-    Camera = workspace.CurrentCamera
-    if Camera and AimSettings.PrevCameraType == nil then
-        AimSettings.PrevCameraType = Camera.CameraType
+    AimSettings.Locked = true
+    AimSettings.LockedPlayer = Player
+    AimSettings.LockedPart = Part
+
+    local Camera = workspace.CurrentCamera
+    if Camera then
         pcall(function()
             Camera.CameraType = Enum.CameraType.Scriptable
         end)
     end
-    AimSettings.Locked = true
-    AimSettings.LockedPlayer = Player
-    AimSettings.LockedPart = Part
+
+    pcall(function()
+        UserInputService.MouseBehavior = Enum.MouseBehavior.LockCenter
+    end)
 end
 
 local function LockOntoClosest()
@@ -1925,20 +1927,16 @@ pcall(function()
     end
 end)
 
--- CamLock: high priority bind so it wins over default camera scripts
 local function CamLockStep()
     if not AimSettings.Enabled or not AimSettings.Locked then
         return
     end
 
-    Camera = workspace.CurrentCamera
+    local Camera = workspace.CurrentCamera
     if not Camera then return end
 
-    -- keep camera scriptable while locked
+    -- Keep it Scriptable while locked
     if Camera.CameraType ~= Enum.CameraType.Scriptable then
-        if AimSettings.PrevCameraType == nil then
-            AimSettings.PrevCameraType = Camera.CameraType
-        end
         pcall(function()
             Camera.CameraType = Enum.CameraType.Scriptable
         end)
@@ -1952,7 +1950,7 @@ local function CamLockStep()
         return
     end
 
-    -- refresh part if character respawned / part changed
+    -- Refresh part if needed
     if not Part or not Part.Parent or not Part:IsDescendantOf(Player.Character or workspace) then
         Part = GetAimPart(Player)
         AimSettings.LockedPart = Part
@@ -1963,16 +1961,30 @@ local function CamLockStep()
         return
     end
 
-    local camPos = Camera.CFrame.Position
+    local localRoot = GetRoot(LocalPlayer.Character)
+    if not localRoot then return end
+
     local targetPos = Part.Position
+
+    -- Position camera behind your character looking at the target
+    local direction = (targetPos - localRoot.Position)
+    if direction.Magnitude < 1 then
+        direction = localRoot.CFrame.LookVector
+    else
+        direction = direction.Unit
+    end
+
+    local distance = 11
+    local height = 2.5
+    local camPos = localRoot.Position - direction * distance + Vector3.new(0, height, 0)
+
     local desired = CFrame.lookAt(camPos, targetPos)
 
     local smooth = AimSettings.Smoothness
     if smooth <= 0 then
         Camera.CFrame = desired
     else
-        -- alpha: lower Smoothness = snappier. Frame-rate independent-ish blend
-        local alpha = math.clamp(1 - smooth, 0.05, 1)
+        local alpha = math.clamp(1 - smooth, 0.08, 1)
         Camera.CFrame = Camera.CFrame:Lerp(desired, alpha)
     end
 end
@@ -2246,31 +2258,6 @@ Library:Connect(Players.PlayerRemoving, function(P)
     RemoveESP(P)
 end)
 
--- Movement
-local function ApplyMovement(WalkSpeed, JumpPower)
-    local Character = LocalPlayer.Character
-    local Humanoid = GetHumanoid(Character)
-    if not Humanoid then return end
-    if WalkSpeed ~= nil then
-        Humanoid.WalkSpeed = WalkSpeed
-    end
-    if JumpPower ~= nil then
-        if Humanoid.UseJumpPower then
-            Humanoid.JumpPower = JumpPower
-        else
-            Humanoid.JumpHeight = JumpPower
-        end
-    end
-end
-
-local SavedWalkSpeed = 16
-local SavedJumpPower = 50
-
-LocalPlayer.CharacterAdded:Connect(function()
-    task.wait(0.25)
-    ApplyMovement(SavedWalkSpeed, SavedJumpPower)
-end)
-
 -- Owner / Developer join notification
 local function NotifyDeveloperJoined(Player)
     if not Player or Player.UserId ~= OWNER_USER_ID then return end
@@ -2481,31 +2468,6 @@ ESPColors:Colorpicker({
     Flag = "ESPTracerColor",
     Default = ESPSettings.TracerColor,
     Callback = function(C) ESPSettings.TracerColor = C end,
-})
-
--- Player / Movement
-local PlayerSection = PlayerTab:Section({ Name = "Movement", Side = "Left" })
-PlayerSection:Slider({
-    Name = "Walk Speed",
-    Flag = "LarpWalkSpeed",
-    Min = 0,
-    Max = 100,
-    Default = 16,
-    Callback = function(Value)
-        SavedWalkSpeed = Value
-        ApplyMovement(SavedWalkSpeed, nil)
-    end,
-})
-PlayerSection:Slider({
-    Name = "Jump Power",
-    Flag = "LarpJumpPower",
-    Min = 0,
-    Max = 150,
-    Default = 50,
-    Callback = function(Value)
-        SavedJumpPower = Value
-        ApplyMovement(nil, SavedJumpPower)
-    end,
 })
 
 local ControlSection = SettingsTab:Section({ Name = "Keybinds", Side = "Left" })
