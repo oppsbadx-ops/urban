@@ -2288,7 +2288,6 @@ local Win = Library:Window({
 
 local AimTab = Win:Tab({ Name = "Combat" })
 local VisualsTab = Win:Tab({ Name = "Visuals" })
-local PlayerTab = Win:Tab({ Name = "Player" })
 local SettingsTab = Win:Tab({ Name = "Settings" })
 
 -- Combat / CamLock
